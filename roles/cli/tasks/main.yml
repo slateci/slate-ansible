@@ -17,3 +17,6 @@
   changed_when: slate_cli_check is failed
   failed_when: False
   notify: Install new SLATE CLI
+
+- name: Force all handlers to run
+  meta: flush_handlers
