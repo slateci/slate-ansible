@@ -2,7 +2,7 @@
 Registers an existing Kubernetes cluster with SLATE.
 
 ## Requirements
-- User with `ssh` access and read access to `/etc/kubernetes/admin.conf`.
+- User with `ssh` access to `node1` and read access to `/etc/kubernetes/admin.conf`.
 - `kubectl` installed on `node1`.
 - Kubernetes cluster instantiated with MetalLB.
 
