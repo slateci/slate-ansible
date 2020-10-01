@@ -2,7 +2,7 @@
 Registers an existing Kubernetes cluster with SLATE.
 
 ## Requirements
-- User with `ssh` access to `node1` and read access to `/etc/kubernetes/admin.conf`.
+- User with `ssh` access to `node1` and passwordless `sudo` privileges.
 - `kubectl` installed on `node1`.
 - Kubernetes cluster instantiated with MetalLB.
 
@@ -31,4 +31,4 @@ all:
 If you used kubespray to provision your Kubernetes cluster, you can use the same `hosts.yaml` file you used with kubespray.
 
 ## Use
-`ansible-playbook -i INVENTORY_FILE -u SSH_USER site.yml`
+`ansible-playbook -i INVENTORY_FILE -u SSH_USER --become --become-user=root site.yml`
