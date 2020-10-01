@@ -1,0 +1,25 @@
+---
+- name: Create SLATE directory
+  file:
+    dest: ~/.slate
+    mode: 0700
+    state: directory
+
+- name: Create SLATE token
+  copy:
+    dest: ~/.slate/token
+    mode: 0600
+    content: "{{ slate_cli_token }}"
+
+- name: Create SLATE endpoint
+  copy:
+    dest: ~/.slate/endpoint
+    mode: 0600
+    content: "{{ slate_cli_endpoint }}"
+
+- name: Check if registered with SLATE
+  shell: /usr/local/bin/slate cluster list | grep {{ slate_cluster_name }}
+  register: slate_registration_result
+  failed_when: False
+  changed_when: slate_registration_result is failed
+  notify: Register cluster with SLATE

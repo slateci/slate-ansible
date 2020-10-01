@@ -1,0 +1,6 @@
+---
+- name: Register cluster with SLATE
+  shell: slate cluster create {{ slate_cluster_name }} --group '{{ slate_group_name }}' --org '{{ slate_org_name }}' -y
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"

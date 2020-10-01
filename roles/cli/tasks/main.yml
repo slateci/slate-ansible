@@ -1,0 +1,19 @@
+---
+- name: Install dependencies
+  package:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - 'jq'
+    - 'curl'
+
+- name: Check if we need to install or upgrade the SLATE CLI
+  shell: >-
+    test -f /usr/local/bin/slate &&
+    test $(/usr/local/bin/slate version | grep -Pzo "Client Version.*\\n\\K(\\d+)(?=.*)") =
+    $(curl -L https://jenkins.slateci.io/artifacts/client/latest.json |
+    jq -r ".[0].version")
+  register: slate_cli_check
+  changed_when: slate_cli_check is failed
+  failed_when: False
+  notify: Install new SLATE CLI

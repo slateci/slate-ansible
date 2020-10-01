@@ -1,0 +1,6 @@
+---
+- name: Register cluster with SLATE
+  hosts: kube-master[0]
+  roles:
+    - cli
+    - registration
