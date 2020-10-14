@@ -4,3 +4,6 @@
   environment:
     KUBECONFIG: /etc/kubernetes/admin.conf
     PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+  # Timeout if it doesn't succeed in 3 minutes
+  async: 180
+  poll: 10
