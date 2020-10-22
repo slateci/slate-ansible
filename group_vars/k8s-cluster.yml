@@ -3,4 +3,4 @@
 # slate_group_name: ""
 # slate_org_name: ""
 # slate_cluster_name: ""
-slate_enable_ingress: true
+# slate_enable_ingress: true
