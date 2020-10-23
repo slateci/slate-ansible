@@ -1,22 +1,32 @@
 ---
-- name: Install dependencies
-  package:
-    name: "{{ item }}"
-    state: latest
-  loop:
-    - 'jq'
-    - 'curl'
-
 - name: Check if we need to install or upgrade the SLATE CLI
-  shell: >-
-    test -f /usr/local/bin/slate &&
-    test $(/usr/local/bin/slate version | grep -Pzo "Client Version.*\\n\\K(\\d+)(?=.*)") =
-    $(curl -L https://jenkins.slateci.io/artifacts/client/latest.json |
-    jq -r ".[0].version")
-  register: slate_cli_check
-  changed_when: slate_cli_check is failed
-  failed_when: False
-  notify: Install new SLATE CLI
+  block:
+    - name: Check if the SLATE binary is installed
+      stat:
+        path: /usr/local/bin/slate
+      changed_when: False
+      register: slate_binary_stat
 
-- name: Force all handlers to run
-  meta: flush_handlers
+    - name: Get the latest SLATE binary version
+      uri:
+        url: https://jenkins.slateci.io/artifacts/client/latest.json
+      changed_when: False
+      register: slate_binary_latest_version
+      when: slate_binary_stat.stat.exists
+
+    - name: Get current SLATE binary version
+      shell: slate version
+      environment:
+        PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+      changed_when: False
+      register: slate_binary_current_version
+      when: slate_binary_stat.stat.exists
+
+- name: Install new SLATE CLI
+  unarchive:
+    mode: "775"
+    dest: /usr/local/bin
+    remote_src: yes
+    src: https://jenkins.slateci.io/artifacts/client/slate-linux.tar.gz
+  notify: Setup SLATE CLI completions
+  when: not slate_binary_stat.stat.exists or ( slate_binary_latest_version['json'][0]['version'] != slate_binary_current_version.stdout_lines[1].split()[0] )

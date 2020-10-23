@@ -1,11 +1,3 @@
 ---
-- name: Install new SLATE CLI
-  unarchive:
-    mode: "775"
-    dest: /usr/local/bin
-    remote_src: yes
-    src: https://jenkins.slateci.io/artifacts/client/slate-linux.tar.gz
-  notify: Setup SLATE CLI completions
-
 - name: Setup SLATE CLI completions
   shell: /usr/local/bin/slate completion > /etc/bash_completion.d/slate
