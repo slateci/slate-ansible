@@ -1,9 +1,0 @@
----
-- name: Register cluster with SLATE
-  shell: slate cluster create {{ slate_cluster_name }} --group '{{ slate_group_name }}' --org '{{ slate_org_name }}' -y {{ slate_enable_ingress | ternary('', '--no-ingress') }}
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
-  # Timeout if it doesn't succeed in 3 minutes
-  async: 180
-  poll: 10

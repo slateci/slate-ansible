@@ -18,8 +18,28 @@
     content: "{{ slate_cli_endpoint }}"
 
 - name: Check if registered with SLATE
-  shell: /usr/local/bin/slate cluster list | grep {{ slate_cluster_name }}
+  shell: >-
+    set -o pipefail;
+    slate cluster list |
+    awk 'BEGIN { found = 1 } NR>1 { if ($2 == "{{ slate_group_name }}") { if ($1 == "{{ slate_cluster_name }}") { found = 0; exit } } } END { print found }'
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+  args:
+    executable: /bin/bash
   register: slate_registration_result
-  failed_when: False
-  changed_when: slate_registration_result is failed
-  notify: Register cluster with SLATE
+  changed_when: False
+
+- name: Register cluster with SLATE
+  shell: >-
+    slate cluster create {{ slate_cluster_name }}
+    --group '{{ slate_group_name }}'
+    --org '{{ slate_org_name }}'
+    -y
+    {{ slate_enable_ingress | bool | ternary('', '--no-ingress') }}
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+  when: slate_registration_result.stdout != "0"
+  # Timeout if it doesn't succeed in 3 minutes
+  async: 180
+  poll: 10
