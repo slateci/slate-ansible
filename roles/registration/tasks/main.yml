@@ -1,45 +1,95 @@
 ---
-- name: Create SLATE directory
-  file:
-    dest: ~/.slate
-    mode: 0700
-    state: directory
+- name: Create temporary SLATE credential files
+  block:
+    - name: Create temporary SLATE credential file
+      tempfile:
+        state: file
+      register: cred_file
+      changed_when: False
+    - name: Copy SLATE token to temporary credential file
+      copy:
+        dest: "{{ cred_file.path }}"
+        content: "{{ slate_cli_token }}"
+      changed_when: False
 
-- name: Create SLATE token
-  copy:
-    dest: ~/.slate/token
-    mode: 0600
-    content: "{{ slate_cli_token }}"
+- block:
+  - name: Check if registered with SLATE
+    shell: >-
+      set -o pipefail;
+      slate cluster list |
+      awk 'BEGIN { found = 1 } NR>1 { if ($2 == "{{ slate_group_name }}") { if ($1 == "{{ slate_cluster_name }}") { found = 0; exit } } } END { print found }'
+    environment:
+      PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+      SLATE_API_ENDPOINT: "{{ slate_cli_endpoint }}"
+      SLATE_CRED_PATH: "{{ cred_file.path }}"
+    args:
+      executable: /bin/bash
+    register: slate_registration_result
+    changed_when: False
+  rescue:
+    - name: Delete temporary SLATE credential file
+      file:
+        path: "{{ cred_file.path }}"
+        state: absent
+      changed_when: False
 
-- name: Create SLATE endpoint
-  copy:
-    dest: ~/.slate/endpoint
-    mode: 0600
-    content: "{{ slate_cli_endpoint }}"
+- name: Create temporary kubeconfig
+  block:
+    - name: Create temporary kubeconfig file
+      tempfile:
+        state: file
+      register: kubeconfig_file
+      changed_when: False
+    - name: Copy existing kubeconfig file contents to temporary kubeconfig file
+      copy:
+        remote_src: yes
+        src: '/etc/kubernetes/admin.conf'
+        dest: "{{ kubeconfig_file.path }}"
+      changed_when: False
+    - name: Replace server address in temporary kubeconfig file
+      lineinfile:
+        path: "{{ kubeconfig_file.path }}"
+        regexp: '^(\s+)server: https://[\d.]+(?::\d+)?$'
+        line: '\1server: https://{{ cluster_access_ip }}'
+        backrefs: yes
+      changed_when: False
+  when: cluster_access_ip is defined and slate_registration_result.stdout != "0"
+  rescue:
+    - name: Delete temporary SLATE credential file
+      file:
+        path: "{{ cred_file.path }}"
+        state: absent
+      changed_when: False
 
-- name: Check if registered with SLATE
-  shell: >-
-    set -o pipefail;
-    slate cluster list |
-    awk 'BEGIN { found = 1 } NR>1 { if ($2 == "{{ slate_group_name }}") { if ($1 == "{{ slate_cluster_name }}") { found = 0; exit } } } END { print found }'
-  environment:
-    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
-  args:
-    executable: /bin/bash
-  register: slate_registration_result
-  changed_when: False
-
-- name: Register cluster with SLATE
-  shell: >-
-    slate cluster create {{ slate_cluster_name }}
-    --group '{{ slate_group_name }}'
-    --org '{{ slate_org_name }}'
-    -y
-    {{ slate_enable_ingress | bool | ternary('', '--no-ingress') }}
-  environment:
-    KUBECONFIG: /etc/kubernetes/admin.conf
-    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
-  when: slate_registration_result.stdout != "0"
-  # Timeout if it doesn't succeed in 3 minutes
-  async: 180
-  poll: 10
+- block:
+    - name: Register cluster with SLATE
+      shell: >-
+        slate cluster create {{ slate_cluster_name }}
+        --group '{{ slate_group_name }}'
+        --org '{{ slate_org_name }}'
+        -y
+        {{ slate_enable_ingress | bool | ternary('', '--no-ingress') }}
+      environment:
+        # For some god awful reason, Ansible evaluates both sides of the ternary
+        # regardless of which path is being taken. Thus, we need a default condition
+        # for when the key is not present in kubeconfig_file.
+        KUBECONFIG: "{{ cluster_access_ip is defined | ternary((kubeconfig_file.path | default('')), '/etc/kubernetes/admin.conf') }}"
+        PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+        SLATE_API_ENDPOINT: "{{ slate_cli_endpoint }}"
+        SLATE_CRED_PATH: "{{ cred_file.path }}"
+      when: slate_registration_result.stdout != "0"
+      # Timeout if it doesn't succeed in 3 minutes
+      async: 180
+      poll: 10
+  always:
+    - name: Delete temporary kubeconfig
+      file:
+        path: "{{ kubeconfig_file.path }}"
+        state: absent
+      changed_when: False
+      when: cluster_access_ip is defined and slate_registration_result.stdout != "0"
+    - name: Delete temporary SLATE credential file
+      file:
+        path: "{{ cred_file.path }}"
+        state: absent
+      changed_when: False
